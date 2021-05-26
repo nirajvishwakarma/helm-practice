@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lets-chat-mongo
+  labels:
+    app: lets-chat
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lets-chat
+  template:
+    metadata:
+      labels:
+        app: lets-chat
+        tier: backend
+    spec:
+      containers:
+      - name: lets-chat-mongo
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 27017

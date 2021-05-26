@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lets-chat-app
+  labels:
+    app: lets-chat
+    tier: frontend
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: lets-chat-app-port
+  selector:
+    app: lets-chat
+    tier: frontend
