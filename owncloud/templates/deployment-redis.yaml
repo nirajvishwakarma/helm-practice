@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: redis
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: redis
+      name: redis
+    spec:
+      containers:
+      - image: docker.io/redis:5.0
+        imagePullPolicy: Always
+        name: redis
+        ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      - args:
+        - 'trap : TERM INT; sleep infinity & wait'
+        command:
+        - /bin/bash
+        - -c
+        image: docker.io/healthcheck/redis:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          exec:
+            command:
+            - /usr/local/bin/docker-healthcheck
+          failureThreshold: 30
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+        name: healthcheck
+        readinessProbe:
+          exec:
+            command:
+            - /usr/local/bin/docker-healthcheck
+          failureThreshold: 30
+          initialDelaySeconds: 60
+          timeoutSeconds: 3
+      hostname: redis
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: redis

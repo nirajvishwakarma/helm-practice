@@ -1,0 +1,13 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: owncloud
+spec:
+  rules:
+  - host: {{ .Values.publicDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: owncloud
+          servicePort: http

@@ -1,0 +1,326 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: owncloud
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: owncloud
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: mariadb
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: redis
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: owncloud
+  spec:
+    ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: https
+    selector:
+      app: owncloud
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: mariadb
+  spec:
+    ports:
+    - name: mariadb
+      port: 3306
+      protocol: TCP
+      targetPort: mariadb
+    selector:
+      app: mariadb
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: redis
+  spec:
+    ports:
+    - name: redis
+      port: 63790
+      protocol: TCP
+      targetPort: redis
+    selector:
+      app: redis
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: mariadb
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: mariadb
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: mariadb
+        name: mariadb
+      spec:
+        containers:
+        - env:
+          - name: MYSQL_ROOT_PASSWORD
+            value: owncloud
+          - name: MYSQL_USER
+            value: owncloud
+          - name: MYSQL_PASSWORD
+            value: owncloud
+          - name: MYSQL_DATABASE
+            value: owncloud
+          image: docker.io/mariadb:10.4
+          imagePullPolicy: Always
+          name: mariadb
+          ports:
+          - containerPort: 3306
+            name: mariadb
+            protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+        - args:
+          - 'trap : TERM INT; sleep infinity & wait'
+          command:
+          - /bin/bash
+          - -c
+          env:
+          - name: MYSQL_USER
+            value: root
+          - name: MYSQL_PASSWORD
+            value: owncloud
+          image: docker.io/healthcheck/mysql:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - /usr/local/bin/docker-healthcheck
+            failureThreshold: 30
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
+          name: healthcheck
+          readinessProbe:
+            exec:
+              command:
+              - /usr/local/bin/docker-healthcheck
+            failureThreshold: 30
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
+        hostname: mariadb
+        volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mariadb
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: owncloud
+    name: owncloud
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: owncloud
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: owncloud
+        name: owncloud
+      spec:
+        containers:
+        - env:
+          - name: OWNCLOUD_DOMAIN
+            value: owncloud.apps.primitivo.tvitt.io
+          - name: OWNCLOUD_PROTOCOL
+            value: https
+          - name: OWNCLOUD_CROND_ENABLED
+            value: "false"
+          - name: OWNCLOUD_BACKGROUND_MODE
+            value: webcron
+          - name: OWNCLOUD_DB_TYPE
+            value: mysql
+          - name: OWNCLOUD_DB_HOST
+            value: mariadb
+          - name: OWNCLOUD_DB_NAME
+            value: owncloud
+          - name: OWNCLOUD_DB_USERNAME
+            value: owncloud
+          - name: OWNCLOUD_DB_PASSWORD
+            value: owncloud
+          - name: OWNCLOUD_REDIS_ENABLED
+            value: "true"
+          - name: OWNCLOUD_REDIS_HOST
+            value: redis
+          - name: OWNCLOUD_REDIS_PORT
+            value: "6379"
+          - name: OWNCLOUD_VOLUME_ROOT
+            value: /var/lib/owncloud
+          - name: OWNCLOUD_LOG_FILE
+            value: /dev/stdout
+          - name: OWNCLOUD_ADMIN_USERNAME
+            value: admin
+          - name: OWNCLOUD_ADMIN_PASSWORD
+            value: Tankwart100
+          - name: OWNCLOUD_SESSION_SAVE_HANDLER
+            value: redis
+          - name: OWNCLOUD_SESSION_SAVE_PATH
+            value: tcp://redis:6379?database=1
+          - name: OWNCLOUD_SKIP_CHOWN
+            value: "true"
+          image: docker.io/owncloud/server:10.1.1
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - /usr/bin/healthcheck
+            failureThreshold: 30
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
+          name: owncloud
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /usr/bin/healthcheck
+            failureThreshold: 60
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+          - mountPath: /var/lib/owncloud
+            name: data
+        hostname: owncloud
+        serviceAccount: owncloud
+        volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: owncloud
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: redis
+    name: redis
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: redis
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: redis
+        name: redis
+      spec:
+        containers:
+        - image: docker.io/redis:5.0
+          imagePullPolicy: Always
+          name: redis
+          ports:
+          - containerPort: 6379
+            name: redis
+            protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+          - mountPath: /data
+            name: data
+        - args:
+          - 'trap : TERM INT; sleep infinity & wait'
+          command:
+          - /bin/bash
+          - -c
+          image: docker.io/healthcheck/redis:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - /usr/local/bin/docker-healthcheck
+            failureThreshold: 30
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
+          name: healthcheck
+          readinessProbe:
+            exec:
+              command:
+              - /usr/local/bin/docker-healthcheck
+            failureThreshold: 30
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
+        hostname: redis
+        volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: redis
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  metadata:
+    name: webcron
+  spec:
+    failedJobsHistoryLimit: 5
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            containers:
+            - args:
+              - curl
+              - http://owncloud:8080/cron.php
+              image: docker.io/owncloud/server:10.1.1
+              name: webcron
+            restartPolicy: OnFailure
+    schedule: '*/15 * * * *'
+    successfulJobsHistoryLimit: 0
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: owncloud
+  spec:
+    port:
+      targetPort: http
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: owncloud

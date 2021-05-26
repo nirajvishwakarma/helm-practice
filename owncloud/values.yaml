@@ -1,0 +1,4 @@
+publicDomain: owncloud.apps.primitivo.tvitt.io
+image: docker.io/owncloud/server:10.1.1
+admin: admin
+password: Tankwart100

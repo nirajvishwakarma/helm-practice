@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: owncloud
+  name: owncloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: owncloud
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: owncloud
+      name: owncloud
+    spec:
+      containers:
+      - env:
+        - name: OWNCLOUD_DOMAIN
+          value: {{ .Values.publicDomain }}
+        - name: OWNCLOUD_PROTOCOL
+          value: https
+        - name: OWNCLOUD_CROND_ENABLED
+          value: "false"
+        - name: OWNCLOUD_BACKGROUND_MODE
+          value: webcron
+        - name: OWNCLOUD_DB_TYPE
+          value: mysql
+        - name: OWNCLOUD_DB_HOST
+          value: mariadb
+        - name: OWNCLOUD_DB_NAME
+          value: owncloud
+        - name: OWNCLOUD_DB_USERNAME
+          value: owncloud
+        - name: OWNCLOUD_DB_PASSWORD
+          value: owncloud
+        - name: OWNCLOUD_REDIS_ENABLED
+          value: "true"
+        - name: OWNCLOUD_REDIS_HOST
+          value: redis
+        - name: OWNCLOUD_REDIS_PORT
+          value: "6379"
+        - name: OWNCLOUD_VOLUME_ROOT
+          value: /var/lib/owncloud
+        - name: OWNCLOUD_LOG_FILE
+          value: /dev/stdout
+        - name: OWNCLOUD_ADMIN_USERNAME
+          value: {{ .Values.admin }}
+        - name: OWNCLOUD_ADMIN_PASSWORD
+          value: {{ .Values.password }}
+        - name: OWNCLOUD_SESSION_SAVE_HANDLER
+          value: redis
+        - name: OWNCLOUD_SESSION_SAVE_PATH
+          value: tcp://redis:6379?database=1
+        - name: OWNCLOUD_SKIP_CHOWN
+          value: "true"
+        image: {{ .Values.image }}
+        imagePullPolicy: Always
+        #livenessProbe:
+        #  exec:
+        #    command:
+        #    - /usr/bin/healthcheck
+        #  failureThreshold: 30
+        #  initialDelaySeconds: 60
+        #  timeoutSeconds: 3
+        name: owncloud
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        #readinessProbe:
+        #  exec:
+        #    command:
+        #    - /usr/bin/healthcheck
+        #  failureThreshold: 60
+        #  initialDelaySeconds: 60
+        #  timeoutSeconds: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - mountPath: /var/lib/owncloud
+          name: data
+      hostname: owncloud
+      serviceAccount: owncloud
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: owncloud

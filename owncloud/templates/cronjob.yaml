@@ -1,0 +1,19 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: webcron
+spec:
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - curl
+            - http://owncloud:8080/cron.php
+            image: {{ .Values.image }}
+            name: webcron
+          restartPolicy: OnFailure
+  schedule: '*/15 * * * *'
+  successfulJobsHistoryLimit: 0
